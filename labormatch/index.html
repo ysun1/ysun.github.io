@@ -52,7 +52,7 @@
     .attr("height", h);
     
     //Load GeoJSON shape files
-    d3.json("http://localhost:8000/us-states.json", function(json) {
+    d3.json("us-states.json", function(json) {
     
     //Bind data and create one path per GeoJSON feature
     svg.selectAll("path")
