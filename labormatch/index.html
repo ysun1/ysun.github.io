@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Simple US Map</title>
+    <title>Job Openings By State</title>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.3/d3.min.js"></script>
     <style type="text/css">
     			.axis path,
@@ -31,9 +31,27 @@
     var padding = 105;
     var margin = {left:40,right:60,top:10,bottom:50}
     
-    var names=['Manufacturing','Energy','Service','Government','Farming']
-    var barColors=['#2C45F3','#3D415A','#3690C0','#C89169','#F322C']
+    var lookup = {
+        "Information": "Information",
+        "Retail Trade": "Retail",
+        "Manufacturing" : "Manufacturing",
+        "Government" : "Government",
+        "Financial Activities" : "Finance",
+        "Leisure and Hospitality": "Leisure",
+        "Education and Health Services" : "Education",
+        "Transportation and Utilities" : "Transportation",
+        "Construction" : "Construction",
+        "Mining and Logging": "Mining"        
+    }
     
+    var names=['Manufacturing','Construction','Transportation','Retail','Education','Government', 'Information','Financial','Leisure','Mining']
+
+
+    var barColors =[]
+    var col = d3.scale.category10()
+    for (i=0;i<10;i++){barColors.push(col(i))}
+    console.log(barColors)
+
     // define projection
     var proj = d3.geo.albersUsa()
                      .translate([w/2,h/2])
@@ -52,7 +70,22 @@
     .attr("height", h);
     
     //Load GeoJSON shape files
-    d3.json("http://ysun1.github.io/labormatch/us-states.json", function(json) {
+    d3.json("us-states.json", function(json) {
+        
+            // load state employment data
+        d3.json("stateIndustryData.json", function(file){
+            var all_data = []
+            for (var j=0; j < file.length;j++){
+                
+                try{d = JSON.parse(file[j])
+                }catch(err) {console.log(err.message)}
+                
+                all_data.push(d)
+            }
+            
+        
+        
+        
     
     //Bind data and create one path per GeoJSON feature
     svg.selectAll("path")
@@ -60,34 +93,61 @@
     .enter()
     .append("path")
     .attr("d", path)
-    .style("fill",function(d){
-        return color[Math.floor(Math.random()*4)]
-        })
-    .style("stroke","none")
+    .style("fill","#3690C0")
+    .style("stroke","white")
+    .style('stroke-width','1px')
     .on("mouseover", function(d){
-        d3.select(this)
-        .style('stroke','white')
-        
+        d3.select(this)      
+        .style('stroke-width','3px')
         })
     .on("mouseout", function(d){
         d3.select(this)
-        .style('stroke','none')
+        .style('stroke','white')
+        .style('stroke-width','1px')
         })
-    .on('click',function(){
-            dataset=[]
-            var maxVal=20
-            for (var i=0;i<5;i++){
-                    dataset.push(Math.floor(Math.random()*maxVal +5))
+    .on('click',function(d){
+       
+            document.getElementById("title").innerHTML= d.properties.name;    
+            obj_set=[]
+            for (var k=0;k<all_data.length;k++){
+                if (all_data[k].StateName == d.properties.name) {
+                    obj_set.push(all_data[k])
+                }
             }
-            console.log(dataset)
-            svg2.selectAll('rect')
-			  		   .data(dataset)
-			  		   .transition()
-			  		   .duration(1000)
-			  		   .attr("width", function(d,i){return xScale(d)})
-			   			
+           
+            // need to get the data values in the right order - the same order as the 'names' array
+            dataset=[]
+            for(l=0; l< names.length;l++){
+                var itemName = names[l]
+                for (x=0; x< names.length;x++){
+                    if (lookup[obj_set[x].IndustryName] == itemName) {dataset.push(obj_set[x].Value)}
+                   
+                }     
+            } // not the brightest way to do this...
+            //console.log(dataset)
+           
+          
             
-            });
+           xScale.domain([0,d3.max(dataset)]);
+            
+     
+            
+        
+            svg2.select('.x.axis')
+                .transition()
+                .duration(500)
+                .call(xAxis)
+            
+            svg2.selectAll('rect')
+                .data(dataset)
+                .transition()
+                .duration(1000)
+                .attr("width", function(d){return xScale(d)
+                    })
+                
+
+                
+    });
     
     
      var svg2 = d3.select("body")
@@ -95,12 +155,19 @@
     .attr("width", w2)
     .attr("height", h2)
     
-    var dataset = [ 5, 10, 24, 11, 21 ];
-    			// create scales
-                        
+    dataset=[]
+            var maxVal=25
+            for (var i=0;i<names.length;i++){
+                    dataset.push(Math.floor(Math.random()*maxVal +5))
+            }
+    obj_set=[] // extract all the numeric data values, to find max and min
+    for (var k=0;k<all_data.length;k++){
+                    obj_set.push(all_data[k])       
+            }
+    flattened_data = obj_set.map(function(ob){return ob.Value})                    
     // create scales
     var yScale = d3.scale.ordinal()
-            .domain(d3.range(dataset.length))
+            .domain(d3.range(names.length))
             .rangeRoundBands([margin.top,h2-margin.bottom],0.35);
             
     var xScale = d3.scale.linear()
@@ -112,21 +179,35 @@
                 .scale(yScale)
                 .orient("left")
                 .tickFormat(function(d,i){return names[i]})
-                .ticks(5);
+                .ticks(names.length);
     
     var xAxis = d3.svg.axis()
         .scale(xScale)
         .orient("bottom")
-        .ticks(5);    
+        .ticks(4);
+        
+
+
     // append bars
             svg2.append("g")
-                            .attr("class", "y axis")
-                            .attr("transform", "translate(" + padding + ",0)")
-                            .call(yAxis);
+                .attr("class", "y axis")
+                .attr("transform", "translate(" + padding + ",0)")
+                .call(yAxis);
+            
             svg2.append("g")
-				.attr("class", "x axis")
-				.attr("transform", "translate(" +padding + "," + (h2 - margin.bottom)+ ")" )
-				.call(xAxis);
+                .attr("class", "x axis")
+                .attr("transform", "translate(" +padding + "," + (h2 - margin.bottom)+ ")" )
+                .call(xAxis);
+            
+            svg2.append("text")
+                .attr("class", "x label")
+                .attr("transform", "translate(" + w2/2.5   + "," + (h2 -padding/10 )+ ")" )
+                .text("Jobs (Thousands)");
+            svg2.append("text")
+                .attr("id", "title")
+                .attr("transform", "translate(" + w2/2   + "," + (padding/7  )+ ")" )
+                .text("State");
+                
 			svg2.selectAll("rect")
 			   .data(dataset)
 			   .enter()
@@ -144,16 +225,22 @@
 			   })
 			   .on('mouseover',function(){
 			   		d3.select(this)
-			   		  .attr('fill','orange')
+			   		  .attr('fill','#FFE357')
+
+
 			   })
+                           
 			   .on('mouseout',function(d,i){
 			   		d3.select(this)
 			   		  .transition()
 			   		  .duration(500)
 			   		  .attr('fill', barColors[i])
+                                        
+
+                                        
 			   })
                         
-                     
+    }) //json                 
     
     }); //json
     
